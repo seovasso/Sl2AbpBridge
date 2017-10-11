@@ -21,7 +21,7 @@
 
 
 module SlReciever(
-    input logic reset,
+    input logic reset_n,
     input logic sl0,
     input logic sl1,
     input logic [1:0] mode,
@@ -41,8 +41,8 @@ always_comb begin
         default: maxcount=6'd0;//непредвиденная ситуация
     endcase
 end
-always_ff @(negedge sl0, negedge sl1, posedge reset) begin
-    if (reset) begin
+always_ff @(negedge sl0, negedge sl1, negedge reset_n) begin
+    if (!reset_n) begin
         counter<=6'b0;
         data<=32'b0;
         valid<=1'b0;
