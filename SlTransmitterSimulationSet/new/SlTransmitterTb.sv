@@ -3,7 +3,7 @@
 
 module SlTransmitterTb();
 
-     logic reset; //ресет
+     logic reset_n; //ресет
      logic sl0wire;//для соединения модулей
      logic sl1wire;//для соединения модулей
      logic [1:0] mode; // 
@@ -16,17 +16,16 @@ module SlTransmitterTb();
      logic clk; //тактовый сигнал
 
     SlTransmitter trans (
-    .reset(reset),
+    .reset_n(reset_n),
      .sl0(sl0wire),
      .sl1(sl1wire),
     .mode(mode),
     .data(dataIn),
-     .en(en),
     .ready(transReady),
     .clk(clk)
     );
      SlReciever res (
-    .reset(reset),
+    .reset_n(reset_n),
      .sl0(sl0wire),
      .sl1(sl1wire),
     .mode(mode),
@@ -42,12 +41,11 @@ module SlTransmitterTb();
         mode=2'b00;
         dataIn=32'd134;
         en=1;
-        
-        reset = 0;
+        reset_n = 1;
         #10
-        reset = 1;
+        reset_n = 0;
         #10 
-        reset=0;
+        reset_n = 1;
         #100;
     end
 endmodule
