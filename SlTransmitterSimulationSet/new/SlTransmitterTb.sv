@@ -11,7 +11,7 @@ module SlTransmitterTb();
      logic [31:0] dataOut;
      logic transReady;
      logic recReady;
-     logic en; // включение передатчика
+     logic enable; // включение передатчика
      logic valid;// правильность сообщения, принятого приемником
      logic clk; //тактовый сигнал
 
@@ -22,7 +22,8 @@ module SlTransmitterTb();
     .mode(mode),
     .data(dataIn),
     .ready(transReady),
-    .clk(clk)
+    .clk(clk),
+    .enable(enable)
     );
      SlReciever res (
     .reset_n(reset_n),
@@ -38,14 +39,16 @@ module SlTransmitterTb();
     end
     initial begin
         clk=0;
-        mode=2'b00;
-        dataIn=32'd134;
-        en=1;
+        mode=2'b01;
+        dataIn=32'd2134;
+        enable=1;
         reset_n = 1;
         #10
         reset_n = 0;
         #10 
         reset_n = 1;
+        #150
+        enable=0;
         #100;
     end
 endmodule

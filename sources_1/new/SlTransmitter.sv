@@ -24,6 +24,7 @@ module SlTransmitter(
     output logic sl0,
     output logic sl1,
     output logic ready,
+    input logic enable,
     input  logic [31:0] data,
     input  logic [1:0] mode,
     input  logic clk,
@@ -54,14 +55,16 @@ module SlTransmitter(
             sl1    <=1'b1;
         end else begin
                 if (ready) begin
-                    buff<=data; 
-                    ready<=1'b0;
+                    sl0 <= 1;
+                    sl1 <= 1;
+                    counter<=6'b0;
+                    if (enable) buff <= data; 
+                    if (enable) ready <= 1'b0;
                 end else 
                 begin
                     if (counter[0]) begin // на нечетных тактах возвращаем шину обратно 
                         sl0 <= 1;
                         sl1 <= 1;
-
                     end else begin
                         if( counter[6:1] < (endBit-1))  begin //отправка битов сообщения
                             if( !buff[0] )begin //в зависимости от содержимого буфера отправляем 0 или 1 
@@ -92,7 +95,7 @@ module SlTransmitter(
                             parSl1 <= 1'b0;
                         end
                     end   
-                    counter <= (counter<maxCount?(counter+1):6'd0);//инкрементируем счетчик             
+                    counter <= (counter<maxCount?(counter+1):6'd0);//инкрементируем счетчик                      
             end
         end
     end
