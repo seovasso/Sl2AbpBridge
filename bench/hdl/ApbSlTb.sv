@@ -49,7 +49,7 @@ module Apb2SlTb(
           .psel1(psel2),
           .paddr(paddr),
           .pwdata(pwdata),
-          .prdata(pwdata),
+          .prdata(prdata),
           .penable(penable),
           .pready(pready),
           .pslverr(pslverr),
@@ -60,10 +60,10 @@ module Apb2SlTb(
     
     // сценарии транзакций чтения и записи
     task writeTransaction;
-      input bit [31:0] wrData;
       input bit [paddrWidth-1:0] wrAddr;
+      input bit [31:0] wrData;
       begin 
-      #clkPeriod;
+      #(clkPeriod-2);
         paddr=wrAddr;
         pwrite=1;
         penable=0;
@@ -100,7 +100,7 @@ module Apb2SlTb(
      initial begin
      //инициализация
      clk=0;
-     pclk=0;
+     pclk=1;
      preset_n=1;
      paddr=0;
      pprot=0;
@@ -114,7 +114,7 @@ module Apb2SlTb(
      #15;
      preset_n=1;
      #40
-     writeTransaction(10'd2,32'd3156);
+     writeTransaction(10'd6,32'd3156);
      end
 
 endmodule

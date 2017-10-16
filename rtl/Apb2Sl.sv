@@ -54,7 +54,10 @@ genvar i;
     if (!preset_n) begin
       configApbReg<=0;
       statusApbReg<=0;
+      pready<=0;
+      pslverr<=0;
       dataApbReg<=0;
+      prdata<=0;
     end else begin
       if (psel1) begin
         if((paddr == DATA_REG_ADDR) 
@@ -66,19 +69,19 @@ genvar i;
          end
          //описание задержки если 
          // описание процессов записи и чтени€
-         if (pready&&penable) begin     //если в предыдущем такте было выставлено pready
+         if (pready) begin     //если в предыдущем такте было выставлено pready
           if(pwrite) begin//запись 
             unique case(paddr)//пишем в регистры
-              DATA_REG_ADDR: begin
+              DATA_REG_ADDR: begin:dataRegWriting
               if(pstrb[0]) dataApbReg[7:0]<=pwdata[7:0];
               if(pstrb[1]) dataApbReg[15:8]<=pwdata[15:8];
               if(pstrb[2]) dataApbReg[23:16]<=pwdata[23:16];
               if(pstrb[3]) dataApbReg[31:24]<=pwdata[31:24];
-//               generate
+               //               generate
 //                for( i = 0; i <= 3; i = i + 1) if(pstrb[i]) dataApbReg[(8*i+7):(8*i)]<=pwdata[(8*i+7):(8*i)];
 //               endgenerate
 //                почему это не работает????
-                end
+                end:dataRegWriting
               CONFIG_REG_ADDR:configApbReg<=pwdata[CONFIG_REG_WIDTH-1:0];
               STATUS_REG_ADDR:statusApbReg<=pwdata[STATUS_REG_WIDTH-1:0];
               default:pslverr<=1;
