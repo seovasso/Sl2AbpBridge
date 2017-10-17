@@ -45,60 +45,121 @@ output  logic              pslverr
 logic [CONFIG_REG_WIDTH-1:0] configApbReg;//буферные регистры синхронизирующиеся по клоку apb
 logic [STATUS_REG_WIDTH-1:0] statusApbReg;
 logic [31:0]                 dataApbReg;
-logic                        transactionStarted;// переменная гласящая о начале транзакции 
+logic [CONFIG_REG_WIDTH-1:0] configBuffReg [1:0];//буферные регистры синхронизирующиеся по клоку clk
+logic [STATUS_REG_WIDTH-1:0] statusBuffReg [1:0];
+logic [31:0]                 dataBuffReg [1:0];
+logic [CONFIG_REG_WIDTH-1:0] configMainReg;//основные регистры синхронизирующиеся по основному клоку 
+logic [STATUS_REG_WIDTH-1:0] statusMainReg;
+logic [31:0]                 dataMainReg;
+logic [1:0]                  stateReg;// переменная чочтояния транзакции
 //переменные для генерации: 
 genvar i;
-
+assign ready=stateReg[1];
   always_ff @(posedge pclk, negedge preset_n)
   begin: apb_transaction
-    if (!preset_n) begin
-      configApbReg<=0;
-      statusApbReg<=0;
-      pready<=0;
-      pslverr<=0;
-      dataApbReg<=0;
-      prdata<=0;
-    end else begin
-      if (psel1) begin
-        if((paddr == DATA_REG_ADDR) 
-            ||(paddr == CONFIG_REG_ADDR)
-             ||(paddr == STATUS_REG_ADDR))// проверка адреса
-         begin
-          transactionStarted<=1;
-          if (1) pready<=1;//TODO: добавить проверку на начало транзиакции
-         end
-         //описание задержки если 
-         // описание процессов записи и чтения
-         if (pready) begin     //если в предыдущем такте было выставлено pready
-          if(pwrite) begin//запись 
-            unique case(paddr)//пишем в регистры
-              DATA_REG_ADDR: begin:dataRegWriting
-              if(pstrb[0]) dataApbReg[7:0]<=pwdata[7:0];
-              if(pstrb[1]) dataApbReg[15:8]<=pwdata[15:8];
-              if(pstrb[2]) dataApbReg[23:16]<=pwdata[23:16];
-              if(pstrb[3]) dataApbReg[31:24]<=pwdata[31:24];
-               //               generate
-//                for( i = 0; i <= 3; i = i + 1) if(pstrb[i]) dataApbReg[(8*i+7):(8*i)]<=pwdata[(8*i+7):(8*i)];
-//               endgenerate
-//                почему это не работает????
-                end:dataRegWriting
-              CONFIG_REG_ADDR:configApbReg<=pwdata[CONFIG_REG_WIDTH-1:0];
-              STATUS_REG_ADDR:statusApbReg<=pwdata[STATUS_REG_WIDTH-1:0];
-              default:pslverr<=1;
-            endcase
-            pready<=0;
-            transactionStarted<=0;
-          end else begin//чтение
-            unique case(paddr)//читаем из регистров
-              DATA_REG_ADDR: prdata<=dataApbReg;
-              CONFIG_REG_ADDR:prdata[CONFIG_REG_WIDTH-1:0]<=configApbReg;
-              STATUS_REG_ADDR:prdata[STATUS_REG_WIDTH-1:0]<=statusApbReg;
-              default:pslverr<=1;
-            endcase
-          end 
-          if (!pready) prdata<=0; 
-         end
-        end
-      end      
+    if (!preset_n) begin: reset_branch 
+      configApbReg  <= 0;
+      statusApbReg  <= 0;
+      pready        <= 0;
+      pslverr       <= 0;
+      dataApbReg    <= 0;
+      prdata        <= 0;
+      stateReg      <= 2'b00;//ожидание сообщения
+    end: reset_branch 
+    else begin: pclk_branch
+        unique case(stateReg)
+        2'b00:
+          begin: wait_transaction_state
+            pslver <= 1;//обнуляем ошибку, если она была
+            if((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)||(paddr == STATUS_REG_ADDR))
+              begin
+                if(pwrite)begin
+                  stateReg <= 2'b11;
+                end else begin
+                  stateReg <= 2'b10;
+                end
+              end
+          end: wait_transaction_state
+        2'b01: begin: pause_transaction_state
+            stateReg <= 2'b00;
+          end: pause_transaction_state
+        2'b10:
+          begin: read_transaction_state
+          if(!penable) slverr<=1;
+            stateReg <= 2'b00;
+          end: read_transaction_state
+        2'b11:
+          begin: write_transaction_state
+            if (penable)begin
+                unique case(paddr)//выбираем, куд писать
+                DATA_REG_ADDR: begin:writing_in_dataReg
+                if(pstrb[0]) dataApbReg[7:0]   <= pwdata[7:0];
+                if(pstrb[1]) dataApbReg[15:8]  <= pwdata[15:8];
+                if(pstrb[2]) dataApbReg[23:16] <= pwdata[23:16];
+                if(pstrb[3]) dataApbReg[31:24] <= pwdata[31:24];
+                //               generate
+                //                for( i = 0; i <= 3; i = i + 1) if(pstrb[i]) dataApbReg[(8*i+7):(8*i)]<=pwdata[(8*i+7):(8*i)];
+                //               endgenerate
+                end:writing_in_dataReg
+                CONFIG_REG_ADDR:configApbReg<=pwdata[CONFIG_REG_WIDTH-1:0];
+                STATUS_REG_ADDR:statusApbReg<=pwdata[STATUS_REG_WIDTH-1:0];
+                default: pslverr <= 1;
+                endcase
+            end else begin
+              pslver <= 1;
+            end
+            stateReg <= 2'b00;
+          end: read_or_write_transaction_state
+        default: stateReg <= 2'b00;
+        endcase;
+      end: pclk_branch
+  end: apb_transaction
+  
+//описание транзакции чтения
+always_comb @(posedge clk, negedge reset_n) begin: read_transaction
+  if (( psel && (~pwrite) )&&((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)
+  ||(paddr == STATUS_REG_ADDR))) begin  
+    unique case(paddr)//выбираем, откуда читать
+    DATA_REG_ADDR:prdata   = dataMainRegister;
+    CONFIG_REG_ADDR:prdata = 32'd0 && configMainRegister; //удлиняем регистры до требуемого размера
+    STATUS_REG_ADDR:prdata = 32'd0 && statusMainRegister;
+    default: prdata = 32'd0;
+    endcase
   end
+end: read_transaction
+  
+//описание двойной буферизации мужду pclk и clk
+always_ff @(posedge clk, negedge reset_n)  begin: double_buffer
+ if (!preset_n) begin: reset_branch 
+  configBuffReg [0] <= 0;
+  configBuffReg [0] <= 0;
+  dataBuffReg   [0] <= 0;
+  configBuffReg [1] <= 0;
+  statusBuffReg [1] <= 0;
+  dataBuffReg   [1] <= 0;
+ end: reset_branch
+ else begin: clk_branch
+  configBuffReg [0] <= configApbReg;
+  configBuffReg [0] <= statusApbReg;
+  dataBuffReg   [0] <= dataApbReg;
+  configBuffReg [1] <= configBuffReg [0];
+  statusBuffReg [1] <= statusBuffReg [0];
+  dataBuffReg   [1] <= dataBuffReg [0];
+ end: clk_branch
+end: double_buffer
+always_ff @(posedge clk, negedge reset_n) begin: main_register_description
+  if (!preset_n) begin: reset_branch 
+    configMainReg  <= 0;
+    configMainReg  <= 0;
+    dataMainReg    <= 0;
+  end: reset_branch
+  else begin: clk_branch
+    if (!preset_n) begin: reset_branch 
+    configMainReg  <= configBuffReg [1];
+    configMainReg  <= statusBuffReg [1] ;
+    dataMainReg    <= dataBuffReg [1];
+  end: reset_branch
+  end:clk_branch
+end: main_register_description
+
 endmodule
