@@ -39,7 +39,6 @@ module Apb2SlTb(
     logic [31:0]            prdata;
     logic [3:0]             pstrb;
     logic                   pready;
-    logic                   pdata;
     logic                   pslverr;
     //определение модуля
          Apb2Sl mod (
@@ -47,6 +46,7 @@ module Apb2SlTb(
           .pclk(pclk),
           .reset_n(reset_n),
           .psel1(psel2),
+          .pwrite(pwrite),
           .paddr(paddr),
           .pwdata(pwdata),
           .prdata(prdata),
@@ -63,23 +63,25 @@ module Apb2SlTb(
       input bit [paddrWidth-1:0] wrAddr;
       input bit [31:0] wrData;
       begin 
-      #(clkPeriod-2);
+        #2;
         paddr=wrAddr;
         pwrite=1;
         penable=0;
         pstrb=4'b1111;
         pwdata=wrData;
         psel2=1;
-      #clkPeriod;
+        #clkPeriod;
         penable=1;
-      #clkPeriod;
-      //while(!pready)begin
+        #clkPeriod;
+        //while(!pready)begin
         psel2=0;
         penable=0;
         pwdata=0;
         paddr=0; 
         pstrb=0;  
-        pwrite=0; 
+        pwrite=0;
+        #(clkPeriod-2);
+        
       end
     endtask;
     task readTransaction();
@@ -102,6 +104,7 @@ module Apb2SlTb(
      clk=0;
      pclk=1;
      preset_n=1;
+     reset_n=1;
      paddr=0;
      pprot=0;
      psel2=0;
@@ -111,10 +114,14 @@ module Apb2SlTb(
      pstrb=0;
      #25;
      preset_n=0;
+     reset_n=0;
      #15;
      preset_n=1;
+     reset_n=1;
      #40
      writeTransaction(10'd6,32'd3156);
+     writeTransaction(10'd7,32'd43156);
+     writeTransaction(10'd5,32'd2156);
      end
 
 endmodule
