@@ -132,7 +132,7 @@ end: read_transaction
 always_ff @(posedge clk, negedge reset_n)  begin: double_buffer
  if (!preset_n) begin: reset_branch 
   configBuffReg [0] <= 0;
-  configBuffReg [0] <= 0;
+  statusBuffReg [0] <= 0;
   dataBuffReg   [0] <= 0;
   configBuffReg [1] <= 0;
   statusBuffReg [1] <= 0;
