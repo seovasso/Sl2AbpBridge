@@ -45,9 +45,9 @@ output  logic              pslverr
 logic [CONFIG_REG_WIDTH-1:0] configApbReg;//буферные регистры синхронизирующиеся по клоку apb
 logic [STATUS_REG_WIDTH-1:0] statusApbReg;
 logic [31:0]                 dataApbReg;
-logic [CONFIG_REG_WIDTH-1:0] configBuffReg [1:0];//буферные регистры синхронизирующиеся по клоку clk
-logic [STATUS_REG_WIDTH-1:0] statusBuffReg [1:0];
-logic [31:0]                 dataBuffReg [1:0];
+logic [CONFIG_REG_WIDTH-1:0] configBuffReg [0:1];//буферные регистры синхронизирующиеся по клоку clk
+logic [STATUS_REG_WIDTH-1:0] statusBuffReg [0:1];
+logic [31:0]                 dataBuffReg [0:1];
 logic [CONFIG_REG_WIDTH-1:0] configMainReg;//основные регистры синхронизирующиеся по основному клоку 
 logic [STATUS_REG_WIDTH-1:0] statusMainReg;
 logic [31:0]                 dataMainReg;
@@ -147,6 +147,7 @@ always_ff @(posedge clk, negedge reset_n)  begin: double_buffer
   dataBuffReg   [1] <= dataBuffReg [0];
  end: clk_branch
 end: double_buffer
+
 always_ff @(posedge clk, negedge reset_n) begin: main_register_description
   if (!preset_n) begin: reset_branch 
     configMainReg  <= 0;
@@ -154,11 +155,9 @@ always_ff @(posedge clk, negedge reset_n) begin: main_register_description
     dataMainReg    <= 0;
   end: reset_branch
   else begin: clk_branch
-    if (!preset_n) begin: reset_branch 
     configMainReg  <= configBuffReg [1];
     statusMainReg  <= statusBuffReg [1] ;
     dataMainReg    <= dataBuffReg [1];
-  end: reset_branch
   end:clk_branch
 end: main_register_description
 
