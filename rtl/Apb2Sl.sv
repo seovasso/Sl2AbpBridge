@@ -63,7 +63,6 @@ assign ready=stateReg[1];
       pready        <= 0;
       pslverr       <= 0;
       dataApbReg    <= 0;
-      prdata        <= 0;
       stateReg      <= 2'b00;//ожидание сообщения
     end: reset_branch 
     else begin: pclk_branch
@@ -117,15 +116,15 @@ assign ready=stateReg[1];
   
 //описание транзакции чтения
 always_comb  begin: read_transaction
-  if (( psel1 && (~pwrite) )&&((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)
+  if ((psel1 && (~pwrite)) && ((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)
   ||(paddr == STATUS_REG_ADDR))) begin  
     unique case(paddr)//выбираем, откуда читать
     DATA_REG_ADDR:prdata   = dataMainReg;
-    CONFIG_REG_ADDR:prdata = 32'd0 || configMainReg; //удлиняем регистры до требуемого размера
-    STATUS_REG_ADDR:prdata = 32'd0 || statusMainReg;
+    CONFIG_REG_ADDR:prdata = 32'd0 | configMainReg; //удлиняем регистры до требуемого размера
+    STATUS_REG_ADDR:prdata = 32'd0 | statusMainReg;
     default: prdata = 32'd0;
-    endcase
-  end
+    endcase 
+  end else prdata = 32'd0;
 end: read_transaction
   
 //описание двойной буферизации мужду pclk и clk
