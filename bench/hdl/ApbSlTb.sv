@@ -1,4 +1,4 @@
-`timescale 1ns / 1ps
+п»ї`timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -18,16 +18,17 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-parameter clkPeriod=10;//период клока
-parameter clkTimeDiff=3;//смещение тактовых сигналов относительно друг друга
-parameter paddrWidth=10;// ширина адресной шины apb
+parameter clkPeriod=10;//РїРµСЂРёРѕРґ РєР»РѕРєР°
+parameter clkTimeDiff=3;//СЃРјРµС‰РµРЅРёРµ С‚Р°РєС‚РѕРІС‹С… СЃРёРіРЅР°Р»РѕРІ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РґСЂСѓРі РґСЂСѓРіР°
+parameter paddrWidth=10;// С€РёСЂРёРЅР° Р°РґСЂРµСЃРЅРѕР№ С€РёРЅС‹ apb
 module Apb2SlTb(
 
     );
 
-    logic clk; //тактовые сигналы: блока
+    logic clk; //С‚Р°РєС‚РѕРІС‹Рµ СЃРёРіРЅР°Р»С‹: Р±Р»РѕРєР°
     logic pclk;// apb
-    // сигналы шины apb
+    // СЃРёРіРЅР°Р»С‹ С€РёРЅС‹ apb
+    logic   [31:0]          readedData;
     logic                   preset_n;
     logic                   reset_n;
     logic [paddrWidth-1:0]  paddr;
@@ -40,7 +41,7 @@ module Apb2SlTb(
     logic [3:0]             pstrb;
     logic                   pready;
     logic                   pslverr;
-    //определение модуля
+    //РѕРїСЂРµРґРµР»РµРЅРёРµ РјРѕРґСѓР»СЏ
          Apb2Sl mod (
           .clk(clk),
           .pclk(pclk),
@@ -58,7 +59,7 @@ module Apb2SlTb(
    );
     
     
-    // сценарии транзакций чтения и записи
+    // СЃС†РµРЅР°СЂРёРё С‚СЂР°РЅР·Р°РєС†РёР№ С‡С‚РµРЅРёСЏ Рё Р·Р°РїРёСЃРё
     task writeTransaction;
       input bit [paddrWidth-1:0] wrAddr;
       input bit [31:0] wrData;
@@ -84,23 +85,40 @@ module Apb2SlTb(
         
       end
     endtask;
-    task readTransaction();
-          begin 
-          
-          end
-        endtask;
     
+    task readTransaction;
+      input  bit [paddrWidth-1:0] rdAddr;
+      begin 
+        #2;
+        paddr=rdAddr;
+        pwrite=0;
+        penable=0;
+        psel2=1;
+        #clkPeriod;
+        penable=1;
+        #clkPeriod;
+        //while(!pready)begin
+        //readedData=prdata;
+        psel2=0;
+        penable=0;
+        paddr=0; 
+        pwrite=0;
+        #(clkPeriod-2);
+        
+      end
+    endtask
     initial
       begin
        #(clkTimeDiff);
-        forever #(clkPeriod/2) clk<=~clk;//первый клок
+        forever #(clkPeriod/2) clk<=~clk;//РїРµСЂРІС‹Р№ РєР»РѕРє
       end
     initial
       begin
-        forever #(clkPeriod/2) pclk<=~pclk;//второй клок
+        forever #(clkPeriod/2) pclk<=~pclk;//РІС‚РѕСЂРѕР№ РєР»РѕРє
       end
      initial begin
-     //инициализация
+     //РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
+     readedData=1;
      clk=0;
      pclk=1;
      preset_n=1;
@@ -122,6 +140,8 @@ module Apb2SlTb(
      writeTransaction(10'd6,32'd3156);
      writeTransaction(10'd7,32'd43156);
      writeTransaction(10'd5,32'd2156);
+     #10
+     readTransaction(10'd6);
      end
 
 endmodule
