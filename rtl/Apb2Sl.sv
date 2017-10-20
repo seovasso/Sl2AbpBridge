@@ -41,21 +41,23 @@ assign out=buffReg[1];
 endmodule
 
 module Apb2Sl(
-input                      clk, //синхронизация обычная
-input                      reset_n, //обычный ресет
-input                      pclk, //синхронизация шины
-input                      preset_n, //ресет apb
-input   [ADDR_WIDTH-1:0]   paddr,
-input                      psel1,
-input                      penable,
-input                      pwrite,
-input   [31:0]             pwdata,
-input   [3:0]              pstrb,
-output  logic              pready,
-output  logic [31:0]       prdata,
-output  logic              pslverr,
-output  logic              outSl0,
-output  logic              outSl1
+input                       clk, //синхронизация обычная
+input                       reset_n, //обычный ресет
+input                       pclk, //синхронизация шины
+input                       preset_n, //ресет apb
+input   [ADDR_WIDTH-1:0]    paddr,
+input                       psel1,
+input                       penable,
+input                       pwrite,
+input   [31:0]              pwdata,
+input   [3:0]               pstrb,
+output  logic               pready,
+output  logic [31:0]        prdata,
+output  logic               pslverr,
+output  logic               outSl0,
+output  logic               outSl1,
+input                      inSl0,
+input                      inSl1
     );
 //внутренние переменные: 
 logic [CONFIG_REG_WIDTH-1:0] configApbReg;//буферные регистры синхронизирующиеся по клоку apb
@@ -78,6 +80,14 @@ logic         transApbReady; //часть синхронизируемая по 
 logic         transEnable;
 logic         transApbEnable;//часть синхронизируемая по Apb pclk
 logic [31:0]  transData;
+
+//переменные для подключения приемника
+logic         recReady; 
+logic         recApbReady; 
+logic         recValid;
+logic         recApbValid;
+logic [31:0]  recData;
+logic [31:0]  recApbData;
 
 //псевдонимы для конфигурациооного регистра
 logic       typeFlag;// 0->передатчик 1->приемник
@@ -123,6 +133,29 @@ assign pready=stateReg[1];
                   end
                   else begin //если передатчик занят
                                         transApbEnable<=0;//запрещаем отправку
+                  end
+                end else begin //если модуль в режиме приемника
+                  if(recApbReady)begin //если сообщение принято
+                    if (recApbValid) begin //если четность совпадает
+                      unique case (configApbReg[1:0])
+                        00:dataApbReg[7:0]<=recApbData[31:24];
+                        01:dataApbReg[15:0]<=recApbData[31:16];
+                        10:dataApbReg<=recApbData;
+                        default: dataApbReg<=recApbData;
+                      endcase
+                      statusApbReg[1]<=1;//сообщение принято
+                      statusApbReg[2]<=1;//четность норм
+                    end else begin// если четность не совпадает
+                    statusApbReg[1]<=1;//сообщение принято
+                    statusApbReg[2]<=0;//четность не норм
+                    if (!configApbReg[3])
+                      unique case (configApbReg[1:0])
+                        00:dataApbReg[7:0]<=recApbData[31:24];
+                        01:dataApbReg[15:0]<=recApbData[31:16];
+                        10:dataApbReg<=recApbData;
+                        default: dataApbReg<=recApbData;
+                      endcase
+                    end
                   end
                 end
               end
@@ -200,10 +233,22 @@ doubleBuffer#(2) modeDoubleBuff ( .in         (mode         ),
                                       .out      (transEnable    ),
                                       .reset_n  (reset_n        ));
                                   
-doubleBuffer#(1) transReadyDoubleBuff ( .in(transReady),
-                                        .clock(pclk),
-                                        .out(transApbReady),
-                                        .reset_n(preset_n));
+doubleBuffer#(1) transReadyDoubleBuff ( .in       (transReady   ),
+                                        .clock    (pclk         ),
+                                        .out      (transApbReady),
+                                        .reset_n  (preset_n     ));
+doubleBuffer#(1) recReadyDoubleBuff (   .in       (recReady     ),
+                                        .clock    (pclk         ),
+                                        .out      (recApbReady  ),
+                                        .reset_n  (preset_n     ));
+doubleBuffer#(1) recValidDoubleBuff (   .in       (recValid     ),
+                                        .clock    (pclk         ),
+                                        .out      (recApbValid  ),
+                                        .reset_n  (preset_n     ));
+doubleBuffer#(32) recDataDoubleBuff (   .in       (recData      ),
+                                        .clock    (pclk         ),
+                                        .out      (recApbData   ),
+                                        .reset_n  (preset_n     ));
 SlTransmitter trans ( .sl0(outSl0),
                       .sl1(outSl1),
                       .ready(transReady),
@@ -212,4 +257,11 @@ SlTransmitter trans ( .sl0(outSl0),
                       .mode(transResMode),
                       .clk(clk),
                       .reset_n(reset_n));
+SlReciever rec( .sl0    (inSl0      ),
+                .sl1    (inSl1      ),
+                .mode   (configApbReg[2:1]),
+                .data   (recData    ),
+                .valid  (recValid   ),
+                .ready  (recReady   ),
+                .reset_n(reset_n    ));
 endmodule
