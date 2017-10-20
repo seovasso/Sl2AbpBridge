@@ -1,4 +1,5 @@
 ﻿`timescale 1ns / 1ps
+`include "const.vh"
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -39,14 +40,6 @@ end: double_buffer
 assign out=buffReg[1];
 endmodule
 
-
-
-parameter ADDR_WIDTH = 10;//ширина шины адрес
-parameter DATA_REG_ADDR = 10'd5; //адрес регистра данных
-parameter CONFIG_REG_ADDR = 10'd6; //адрес конфигурационного регистра
-parameter STATUS_REG_ADDR = 10'd7; //адрес статусного регистра
-parameter CONFIG_REG_WIDTH = 8;//размер конфигурационного регистра
-parameter STATUS_REG_WIDTH = 8;//размер статусного регистра
 module Apb2Sl(
 input                      clk, //синхронизация обычная
 input                      reset_n, //обычный ресет
@@ -60,7 +53,9 @@ input   [31:0]             pwdata,
 input   [3:0]              pstrb,
 output  logic              pready,
 output  logic [31:0]       prdata,
-output  logic              pslverr
+output  logic              pslverr,
+output  logic              outSl0,
+output  logic              outSl1
     );
 //внутренние переменные: 
 logic [CONFIG_REG_WIDTH-1:0] configApbReg;//буферные регистры синхронизирующиеся по клоку apb
@@ -72,16 +67,35 @@ logic [31:0]                 dataBuffReg [0:1];
 logic [CONFIG_REG_WIDTH-1:0] configMainReg;//основные регистры синхронизирующиеся по основному клоку 
 logic [STATUS_REG_WIDTH-1:0] statusMainReg;
 logic [31:0]                 dataMainReg;
-logic [1:0]                  stateReg;// переменная чочтояния транзакции
-//переменные для генерации: 
-genvar i;
-assign ready=stateReg[1];
+logic [1:0]                  stateReg;// переменная состояния транзакции
+
+//переменные для подключения передатчика и приемника 
+logic [1:0] transResMode;
+
+//переменные для подключения передатчика
+logic         transReady; 
+logic         transApbReady; //часть синхронизируемая по Apb pclk
+logic         transEnable;
+logic         transApbEnable;//часть синхронизируемая по Apb pclk
+logic [31:0]  transData;
+
+//псевдонимы для конфигурациооного регистра
+logic       typeFlag;// 0->передатчик 1->приемник
+logic [1:0] mode;//00 ->8 бит 01->16 бит 10->32 бита
+
+//подключение псевдонимов 
+assign typeFlag = configApbReg[0];
+assign mode = configApbReg[2:1];
+
+
+//описание транзакций чтения и записи
+assign pready=stateReg[1];
   always_ff @(posedge pclk, negedge preset_n)
   begin: apb_transaction
     if (!preset_n) begin: reset_branch 
+      transApbEnable<=0;
       configApbReg  <= 0;
-      statusApbReg  <= 0;
-      pready        <= 0;
+      statusApbReg  <= 1;
       pslverr       <= 0;
       dataApbReg    <= 0;
       stateReg      <= 2'b00;//ожидание сообщения
@@ -91,12 +105,25 @@ assign ready=stateReg[1];
         2'b00:
           begin: wait_transaction_state
             pslverr <= 0;//обнуляем ошибку, если она была
-            if(psel1&&((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)||(paddr == STATUS_REG_ADDR)))
+            if(psel1&&((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)||(paddr == STATUS_REG_ADDR)))//описание транзакции
               begin
                 if(pwrite)begin
                   stateReg <= 2'b11;
                 end else begin
                   stateReg <= 2'b10;
+                end
+              end else 
+              begin//управление приемом и передачей
+                if (!configApbReg[0])begin//если модуль в режиме передатчика
+                  if (!statusApbReg[0])begin//если сообщение еще не отправлено
+                    if(transApbReady)begin//если передатчик готов отправить
+                      transApbEnable<=1;//разрешаем отправку
+                      statusApbReg[0]<=1;//помечаем сообщение как отправленное
+                    end 
+                  end
+                  else begin //если передатчик занят
+                                        transApbEnable<=0;//запрещаем отправку
+                  end
                 end
               end
           end: wait_transaction_state
@@ -153,13 +180,36 @@ doubleBuffer dataDoubleBuff ( .in(dataApbReg),
                               .clock(clk),
                               .out(dataMainReg),
                               .reset_n(reset_n));
-doubleBuffer#(CONFIG_REG_WIDTH) configDoubleBuff (.in(configApbReg),
-                                                  .clock(clk),
-                                                  .out(configMainReg),
-                                                  .reset_n(reset_n));
-doubleBuffer#(STATUS_REG_WIDTH) statusDoubleBuff (.in(statusApbReg),
-                                                  .clock(clk),
-                                                  .out(statusMainReg),
-                                                  .reset_n(reset_n));
+doubleBuffer#(CONFIG_REG_WIDTH) configDoubleBuff (.in       (configApbReg ),
+                                                  .clock    (clk          ),
+                                                  .out      (configMainReg),
+                                                  .reset_n  (reset_n)     );
+                                                  
+doubleBuffer#(STATUS_REG_WIDTH) statusDoubleBuff (.in         (statusApbReg ),
+                                                  .clock      (clk          ),
+                                                  .out        (statusMainReg),
+                                                  .reset_n    (reset_n      ));
+                                                  
+doubleBuffer#(2) modeDoubleBuff ( .in         (mode         ),
+                                  .clock      (clk          ),
+                                  .out        (transResMode ),
+                                  .reset_n    (reset_n      ));
 
+  doubleBuffer#(1) enableDoubleBuff ( .in       (transApbEnable ),
+                                      .clock    (clk            ),
+                                      .out      (transEnable    ),
+                                      .reset_n  (reset_n        ));
+                                  
+doubleBuffer#(1) transReadyDoubleBuff ( .in(transReady),
+                                        .clock(pclk),
+                                        .out(transApbReady),
+                                        .reset_n(preset_n));
+SlTransmitter trans ( .sl0(outSl0),
+                      .sl1(outSl1),
+                      .ready(transReady),
+                      .enable(transEnable),
+                      .data(dataMainReg),
+                      .mode(transResMode),
+                      .clk(clk),
+                      .reset_n(reset_n));
 endmodule
