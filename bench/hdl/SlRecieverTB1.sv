@@ -1,4 +1,4 @@
-`timescale 100ps / 1ps
+п»ї`timescale 100ps / 1ps
 `include "C:/Users/Vasso/Documents/vivadoprojects/project_1/project_1.srcs/rtl/SlReciever.sv"
 module SlRecieverTb();
 
@@ -31,7 +31,7 @@ module SlRecieverTb();
         #10 
         reset_n =1;
         #100
-         mess  = '{0,1,0,1,0,0,1,1,0,1,1,0,1,0,0,1,1};//отправляемое сообщение
+         mess  = '{0,1,0,1,0,0,1,1,0,1,1,0,1,0,0,1,1};//РѕС‚РїСЂР°РІР»СЏРµРјРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ
         for (int i=0; i <= 16; i=i+1) begin
             if(mess[i]==0)begin 
             #10 sl1=1;
