@@ -1,4 +1,4 @@
-`timescale 1ns / 1ps
+п»ї`timescale 1ns / 1ps
 `include "const.vh"
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
@@ -19,16 +19,17 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-parameter clkPeriod=10;//период клока
-parameter clkTimeDiff=3;//смещение тактовых сигналов относительно друг друга
-parameter paddrWidth=10;// ширина адресной шины apb
+parameter clkPeriod=10;//РїРµСЂРёРѕРґ РєР»РѕРєР°
+parameter clkTimeDiff=3;//СЃРјРµС‰РµРЅРёРµ С‚Р°РєС‚РѕРІС‹С… СЃРёРіРЅР°Р»РѕРІ РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅРѕ РґСЂСѓРі РґСЂСѓРіР°
+parameter paddrWidth=10;// С€РёСЂРёРЅР° Р°РґСЂРµСЃРЅРѕР№ С€РёРЅС‹ apb
 module Apb2SlTb(
 
     );
-
-    logic clk; //тактовые сигналы: блока
+    logic parSl0;
+    logic parSl1;
+    logic clk; //С‚Р°РєС‚РѕРІС‹Рµ СЃРёРіРЅР°Р»С‹: Р±Р»РѕРєР°
     logic pclk;// apb
-    // сигналы шины apb
+    // СЃРёРіРЅР°Р»С‹ С€РёРЅС‹ apb
     logic   [31:0]          readedData;
     logic                   preset_n;
     logic                   reset_n;
@@ -44,7 +45,9 @@ module Apb2SlTb(
     logic                   pslverr;
     logic                   outSl0;
     logic                   outSl1;
-    //определение модуля
+    logic                   inSl0;
+    logic                   inSl1;
+    //РѕРїСЂРµРґРµР»РµРЅРёРµ РјРѕРґСѓР»СЏ
          Apb2Sl mod (
           .clk(clk),
           .pclk(pclk),
@@ -60,11 +63,52 @@ module Apb2SlTb(
           .pstrb(pstrb),
           .preset_n(preset_n),
           .outSl0(outSl0),
-          .outSl1(outSl1)
+          .outSl1(outSl1),
+          .inSl0(inSl0),
+          .inSl1(inSl1)
    );
-    
-    
-    // сценарии транзакций чтения и записи
+    //СЃС†РµРЅР°СЂРёР№ РїРѕСЃС‹Р»РєРё sl СЃРѕРѕР±С‰РµРЅРёСЏ
+task slTransaction;
+          input bit [31:0] mess;//РѕС‚РїСЂР°РІР»СЏРµРјРѕРµ СЃРѕРѕР±С‰РµРЅРёРµ
+          input int mesLength;//РґР»РёРЅРЅР° СЃРѕРѕР±С‰РµРЅРёСЏ
+          input bit parityRight;//РµСЃР»Рё 1, С‚Рѕ РїСЂР°РІРёР»СЊРЅР°СЏ С‡РµС‚РЅРѕСЃС‚СЊ, РµСЃР»Рё 0 С‚Рѕ РЅРµРїСЂР°РІРёР»СЊРЅР°СЏ
+   begin 
+   parSl0 =1'b1;
+   parSl1 =1'b0;
+     for (int i=0; i < mesLength; i=i+1) begin
+      if(mess[i])begin 
+           parSl0 = ~parSl0;
+           #10 inSl0=1;
+           #10 inSl0=0;
+           #10 inSl0=1;
+      end else begin
+           parSl1 = ~parSl1;
+           #10 inSl1=1;
+           #10 inSl1=0;
+           #10 inSl1=1;
+      end 
+     end 
+     #10 inSl1 = 1;
+     inSl0 = 1;
+     if (parityRight)begin
+       inSl0 = parSl0; // Р±РёС‚ С‡РµС‚РЅРѕСЃС‚Рё РїРѕ 0
+       inSl1 = parSl1; // Р±РёС‚ С‡РµС‚РЅРѕСЃС‚Рё РїРѕ 1
+     end else begin
+       inSl0 = !parSl0; // РЅРµРїСЂР°РІРёР»СЊРЅС‹Р№ Р±РёС‚ С‡РµС‚РЅРѕСЃС‚Рё РїРѕ 0
+       inSl1 = !parSl1; // РЅРµРїСЂР°РІРёР»СЊРЅС‹Р№ Р±РёС‚ С‡РµС‚РЅРѕСЃС‚Рё РїРѕ 1
+     end
+     #10 inSl1 = 1;
+     inSl0 = 1;
+     #10
+     inSl0=0;
+     #2
+     inSl1=0;
+     #10;
+     inSl0=1;
+     inSl1=1;
+     end
+endtask
+   // СЃС†РµРЅР°СЂРёРё С‚СЂР°РЅР·Р°РєС†РёР№ С‡С‚РµРЅРёСЏ Рё Р·Р°РїРёСЃРё
     task writeTransaction;
       input bit [paddrWidth-1:0] wrAddr;
       input bit [31:0] wrData;
@@ -115,14 +159,16 @@ module Apb2SlTb(
     initial
       begin
        #(clkTimeDiff);
-        forever #(clkPeriod/2) clk<=~clk;//первый клок
+        forever #(clkPeriod/2) clk<=~clk;//РїРµСЂРІС‹Р№ РєР»РѕРє
       end
     initial
       begin
-        forever #(clkPeriod/2) pclk<=~pclk;//второй клок
+        forever #(clkPeriod/2) pclk<=~pclk;//РІС‚РѕСЂРѕР№ РєР»РѕРє
       end
      initial begin
-     //инициализация
+     //РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ
+     inSl0=1;
+     inSl1=1;
      readedData=1;
      clk=0;
      pclk=1;
@@ -143,12 +189,16 @@ module Apb2SlTb(
      reset_n=1;
      #40
 //    writeTransaction(CONFIG_REG_ADDR,32'd3156);
-    writeTransaction(DATA_REG_ADDR,32'd43156);
+//    writeTransaction(DATA_REG_ADDR,32'd43156);
+//    writeTransaction(STATUS_REG_ADDR,32'd0);
+    writeTransaction(DATA_REG_ADDR,32'd4453);
     writeTransaction(STATUS_REG_ADDR,32'd0);
-writeTransaction(DATA_REG_ADDR,32'd4453);
-    writeTransaction(STATUS_REG_ADDR,32'd0);
-     #10;
+     #100;
+    writeTransaction(CONFIG_REG_ADDR,32'd1);
+    #10;
+    slTransaction(32'd134,8,1);
 //     readTransaction(10'd6);
      end
+     
 
 endmodule
