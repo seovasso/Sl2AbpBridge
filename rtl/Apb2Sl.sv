@@ -18,6 +18,28 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
+module doubleBuffer#(parameter width=32) (
+input               clock   ,
+input               reset_n ,
+input   [width-1:0] in      ,
+output  [width-1:0] out
+    ) ;
+
+logic [width-1:0] buffReg [0:1];
+always_ff @(posedge clock, negedge reset_n)  begin: double_buffer
+ if (!reset_n) begin: reset_branch 
+  buffReg [0] <= 0;
+  buffReg [1] <= 0;
+ end: reset_branch
+ else begin: clk_branch
+  buffReg [0] <= in;
+  buffReg [1] <= buffReg [0];
+ end: clk_branch
+end: double_buffer
+assign out=buffReg[1];
+endmodule
+
+
 
 parameter ADDR_WIDTH = 10;//ширина шины адрес
 parameter DATA_REG_ADDR = 10'd5; //адрес регистра данных
@@ -39,7 +61,6 @@ input   [3:0]              pstrb,
 output  logic              pready,
 output  logic [31:0]       prdata,
 output  logic              pslverr
-//TODO: Описать выходы
     );
 //внутренние переменные: 
 logic [CONFIG_REG_WIDTH-1:0] configApbReg;//буферные регистры синхронизирующиеся по клоку apb
@@ -119,45 +140,26 @@ always_comb  begin: read_transaction
   if ((psel1 && (~pwrite)) && ((paddr == DATA_REG_ADDR) ||(paddr == CONFIG_REG_ADDR)
   ||(paddr == STATUS_REG_ADDR))) begin  
     unique case(paddr)//выбираем, откуда читать
-    DATA_REG_ADDR:prdata   = dataMainReg;
-    CONFIG_REG_ADDR:prdata = 32'd0 | configMainReg; //удлиняем регистры до требуемого размера
-    STATUS_REG_ADDR:prdata = 32'd0 | statusMainReg;
+    DATA_REG_ADDR:prdata   = dataApbReg;
+    CONFIG_REG_ADDR:prdata = 32'd0 | configApbReg; //удлиняем регистры до требуемого размера
+    STATUS_REG_ADDR:prdata = 32'd0 | statusApbReg;
     default: prdata = 32'd0;
     endcase 
   end else prdata = 32'd0;
 end: read_transaction
   
 //описание двойной буферизации мужду pclk и clk
-always_ff @(posedge clk, negedge reset_n)  begin: double_buffer
- if (!preset_n) begin: reset_branch 
-  configBuffReg [0] <= 0;
-  statusBuffReg [0] <= 0;
-  dataBuffReg   [0] <= 0;
-  configBuffReg [1] <= 0;
-  statusBuffReg [1] <= 0;
-  dataBuffReg   [1] <= 0;
- end: reset_branch
- else begin: clk_branch
-  configBuffReg [0] <= configApbReg;
-  statusBuffReg [0] <= statusApbReg;
-  dataBuffReg   [0] <= dataApbReg;
-  configBuffReg [1] <= configBuffReg [0];
-  statusBuffReg [1] <= statusBuffReg [0];
-  dataBuffReg   [1] <= dataBuffReg [0];
- end: clk_branch
-end: double_buffer
-
-always_ff @(posedge clk, negedge reset_n) begin: main_register_description
-  if (!preset_n) begin: reset_branch 
-    configMainReg  <= 0;
-    statusMainReg  <= 0;
-    dataMainReg    <= 0;
-  end: reset_branch
-  else begin: clk_branch
-    configMainReg  <= configBuffReg [1];
-    statusMainReg  <= statusBuffReg [1] ;
-    dataMainReg    <= dataBuffReg [1];
-  end:clk_branch
-end: main_register_description
+doubleBuffer dataDoubleBuff ( .in(dataApbReg),
+                              .clock(clk),
+                              .out(dataMainReg),
+                              .reset_n(reset_n));
+doubleBuffer#(CONFIG_REG_WIDTH) configDoubleBuff (.in(configApbReg),
+                                                  .clock(clk),
+                                                  .out(configMainReg),
+                                                  .reset_n(reset_n));
+doubleBuffer#(STATUS_REG_WIDTH) statusDoubleBuff (.in(statusApbReg),
+                                                  .clock(clk),
+                                                  .out(statusMainReg),
+                                                  .reset_n(reset_n));
 
 endmodule
