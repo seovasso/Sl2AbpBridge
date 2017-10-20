@@ -1,4 +1,4 @@
-`timescale 1ns / 1ps
+п»ї`timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: 
 // Engineer: 
@@ -29,16 +29,16 @@ module SlReciever(
     output logic valid,
     output logic ready
     );
-logic [5:0] counter;//переменная счетчика
-logic [5:0] maxcount;//максимальное число, до которого считает счетчик
-logic parSl0;//четность sl0
-logic parSl1;//четность sl1
+logic [5:0] counter;//РїРµСЂРµРјРµРЅРЅР°СЏ СЃС‡РµС‚С‡РёРєР°
+logic [5:0] maxcount;//РјР°РєСЃРёРјР°Р»СЊРЅРѕРµ С‡РёСЃР»Рѕ, РґРѕ РєРѕС‚РѕСЂРѕРіРѕ СЃС‡РёС‚Р°РµС‚ СЃС‡РµС‚С‡РёРє
+logic parSl0;//С‡РµС‚РЅРѕСЃС‚СЊ sl0
+logic parSl1;//С‡РµС‚РЅРѕСЃС‚СЊ sl1
 always_comb begin
     case (mode)
         0: maxcount=6'd8;
         1: maxcount=6'd16;
         2: maxcount=6'd32;
-        default: maxcount=6'd0;//непредвиденная ситуация
+        default: maxcount=6'd0;//РЅРµРїСЂРµРґРІРёРґРµРЅРЅР°СЏ СЃРёС‚СѓР°С†РёСЏ
     endcase
 end
 always_ff @(negedge sl0, negedge sl1, negedge reset_n) begin
