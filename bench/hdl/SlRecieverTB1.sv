@@ -1,8 +1,8 @@
 `timescale 100ps / 1ps
-`include "C:/Users/Vasso/Documents/vivadoprojects/project_1/project_1.srcs/sources_1/new/SlReciever.sv"
+`include "C:/Users/Vasso/Documents/vivadoprojects/project_1/project_1.srcs/rtl/SlReciever.sv"
 module SlRecieverTb();
 
-     logic reset;
+     logic reset_n;
      logic sl0;
      logic sl1;
      logic [1:0] mode;
@@ -12,7 +12,7 @@ module SlRecieverTb();
      bit mess [16:0] ;
 
     SlReciever res (
-    .reset(reset),
+    .reset_n(reset_n),
      .sl0(sl0),
      .sl1(sl1),
     .mode(mode),
@@ -25,11 +25,11 @@ module SlRecieverTb();
         mode=2'b01;
         sl0=1;
         sl1=1;
-        reset = 0;
+        reset_n = 1;
         #10
-        reset = 1;
+        reset_n = 0;
         #10 
-        reset=0;
+        reset_n =1;
         #100
          mess  = '{0,1,0,1,0,0,1,1,0,1,1,0,1,0,0,1,1};//отправляемое сообщение
         for (int i=0; i <= 16; i=i+1) begin
