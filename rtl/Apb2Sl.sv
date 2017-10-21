@@ -137,7 +137,7 @@ assign pready=stateReg[1];
                 end else begin //если модуль в режиме приемника
                   if(recApbReady)begin //если сообщение принято
                     if (recApbValid) begin //если четность совпадает
-                      unique case (configApbReg[1:0])
+                      unique case (configApbReg[2:1])
                         00:dataApbReg[7:0]<=recApbData[31:24];
                         01:dataApbReg[15:0]<=recApbData[31:16];
                         10:dataApbReg<=recApbData;
