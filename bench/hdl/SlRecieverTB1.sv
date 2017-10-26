@@ -1,24 +1,24 @@
 `timescale 100ps / 1ps
 
 module SlRecieverTb();
-
+     logic        enable;
      logic        reset_n;
-     logic        parSl0;
-     logic        parSl1;
      logic        inSl0;
      logic        inSl1;
-
-     logic [1:0] mode;
+     logic [4:0]  bitCount;
      logic [31:0] data;
-     logic valid;
-     logic ready;
-     bit mess [16:0] ;
+     logic wordReady;
+     logic wordInProces;
+     logic parityValid;
+     logic bitCountValid;
 
 
 task slTransaction;
           input bit [31:0] mess;//отправляемое сообщение
           input int mesLength;//длинна сообщения
           input bit parityRight;//если 1, то правильная четность, если 0 то неправильная
+          logic        parSl0;
+          logic        parSl1;
    begin
    parSl0 =1'b1;
    parSl1 =1'b0;
@@ -48,7 +48,6 @@ task slTransaction;
      inSl0 = 1;
      #10
      inSl0=0;
-     #2
      inSl1=0;
      #10;
      inSl0=1;
@@ -58,19 +57,22 @@ task slTransaction;
 endtask
 
     SlReciever res (
-    .reset_n(reset_n),
-     .sl0(inSl0),
-     .sl1(inSl1),
-    .mode(mode),
-    .data(data),
-     .valid(valid),
-    .ready(ready)
+        .enable       (enable),
+        .reset_n      (reset_n),
+        .sl0          (inSl0),
+        .sl1          (inSl1),
+        .bitCount     (bitCount),
+        .wordInProces(wordInProces),
+        .wordReady    (wordReady),
+        .dataOut      (data),
+        .parityValid  (parityValid),
+        .bitCountValid(bitCountValid)
     );
  bit [31:0] mes;
 logic curTest,allTest;
     initial begin
         allTest=1;
-        mode=2'b00;
+        bitCount=5'd7;
         inSl0=1;
         inSl1=1;
         reset_n = 1;
@@ -83,7 +85,7 @@ logic curTest,allTest;
         $display("Test #1: 1 correct message l=8");
         mes=$urandom();
         slTransaction(mes,8,1);
-        if ((data [31:24] == mes[7:0]) && valid && ready)begin
+        if ((data [31:24] == mes[7:0]) && bitCountValid && wordReady)begin
           curTest=1;
         end else  begin
           curTest=0;
@@ -93,12 +95,12 @@ logic curTest,allTest;
           $display("test passed");
         end else $display("test failed");
 
+        bitCount=5'd14;
 
-        $display("Test #1: 1 correct message l=16");
+        $display("Test #1: 1 correct message l=15");
         mes=$urandom();
-        mode=2'b10;
         slTransaction(mes,16,1);
-        if ((data [31:16] == mes[15:0]) && valid && ready)begin
+        if ((data [31:17] == mes[14:0]) && bitCountValid && wordReady)begin
           curTest=1;
         end else  begin
           curTest=0;
@@ -108,20 +110,6 @@ logic curTest,allTest;
           $display("test passed");
         end else $display("test failed");
 
-
-        $display("Test #1: 1 correct message l=32");
-        mes=$urandom();
-        mode=2'b10;
-        slTransaction(mes,32,1);
-        if ((data [31:0] == mes[31:0]) && valid && ready)begin
-          curTest=1;
-        end else  begin
-          curTest=0;
-          allTest=0;
-        end
-        if(curTest) begin
-          $display("test passed");
-        end else $display("test failed");
 
 
       if(allTest) begin
